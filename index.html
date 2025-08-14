@@ -27,20 +27,18 @@
     canvas{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:10px}
     .section h2{font-size:16px;margin:10px 0 8px}
 
-    /* Table */
     table{width:100%; border-collapse:separate; border-spacing:0 8px}
     thead th{position:sticky; top:0; background:var(--bg); padding:6px 8px; font-size:12px; color:var(--sub); text-align:left}
     tbody tr{background:var(--panel); border:1px solid var(--border)}
     tbody td{padding:8px; border-top:1px solid var(--border)}
     tbody tr:first-child td{border-top-left-radius:10px;border-top-right-radius:10px}
     tbody tr:last-child td{border-bottom-left-radius:10px;border-bottom-right-radius:10px}
-    input, select, button{background:#0e141c; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:8px 10px; font-size:14px}
-    input[type="number"]{width:120px}
+    input, select, button{background:#0e141c; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:8px 10px; font-size:14px; cursor:pointer}
+    input[type="number"]{width:120px; cursor:text}
     .mono{font-variant-numeric:tabular-nums}
     .toolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
     .chip{background:var(--chip); border:1px solid var(--border); padding:6px 8px; border-radius:999px; font-size:12px;color:var(--sub)}
     .pill{padding:6px 10px; border-radius:999px; background:var(--accent); border:0; color:#001225; font-weight:700}
-    .link{color:var(--accent); text-decoration:none}
     .right{margin-left:auto}
     .muted{color:var(--sub)}
     .note{font-size:12px;color:var(--sub)}
@@ -57,27 +55,26 @@
   </header>
 
   <main class="wrap">
-    <!-- KPIs -->
     <section class="row">
       <div class="card kpi">
         <h3>Total Value (USD)</h3>
         <div class="val mono" id="kpiTotal">$0.00</div>
-        <div class="delta" id="kpiAsOf" class="muted"></div>
+        <div class="delta" id="kpiAsOf"></div>
       </div>
       <div class="card kpi">
         <h3>MoM Change</h3>
         <div class="val mono" id="kpiMoM">0.00%</div>
-        <div class="delta" id="kpiMoMAbs" class="muted"></div>
+        <div class="delta" id="kpiMoMAbs"></div>
       </div>
       <div class="card kpi">
         <h3>YTD Change</h3>
         <div class="val mono" id="kpiYTD">0.00%</div>
-        <div class="delta" id="kpiYTDAbs" class="muted"></div>
+        <div class="delta" id="kpiYTDAbs"></div>
       </div>
       <div class="card kpi">
         <h3>Savings Rate (this month)</h3>
         <div class="val mono" id="kpiSaveRate">0.00%</div>
-        <div class="delta" id="kpiIncomeInfo" class="muted"></div>
+        <div class="delta" id="kpiIncomeInfo"></div>
       </div>
       <div class="card kpi">
         <h3>Best / Worst (MoM)</h3>
@@ -86,7 +83,6 @@
       </div>
     </section>
 
-    <!-- Charts -->
     <section class="grid section">
       <div>
         <h2>Total Value Over Time</h2>
@@ -98,19 +94,18 @@
       </div>
     </section>
 
-    <!-- Controls -->
     <section class="section">
       <h2>Data Entry</h2>
       <div class="toolbar" style="margin-bottom:10px">
         <span class="chip">Months are <b>columns</b></span>
-        <button class="pill" id="btnAddMonth">+ Add Month</button>
-        <button class="pill" id="btnAddInvestment">+ Add Investment</button>
+        <button class="pill" id="btnAddMonth" type="button">+ Add Month</button>
+        <button class="pill" id="btnAddInvestment" type="button">+ Add Investment</button>
         <span class="right"></span>
-        <button id="btnExport">Export JSON</button>
+        <button id="btnExport" type="button">Export JSON</button>
         <input id="fileImport" type="file" accept="application/json" />
-        <button id="btnClear" title="Erase local data">Clear All</button>
+        <button id="btnClear" type="button" title="Erase local data">Clear All</button>
         <input id="fileXLSX" type="file" accept=".xlsx,.xls,.csv" style="display:none" />
-        <button id="btnImportX" title="Import from Excel/CSV">Import Excel/CSV</button>
+        <button id="btnImportX" type="button" title="Import from Excel/CSV">Import Excel/CSV</button>
       </div>
       <div class="note">FX is monthly (USD base): set USD=1.00, and enter USD/RON & USD/EUR as needed.</div>
 
@@ -123,16 +118,17 @@
   </main>
 
 <script>
-// ====== Data Model (persisted in localStorage) ======
+document.addEventListener('DOMContentLoaded', () => {
+// ====== Data Model ======
 const LS_KEY = 'pf_data_v1';
 const DEFAULT_CURRENCIES = ['USD','EUR','RON'];
 
 let state = load() || {
-  months: [], // ["2025-01", "2025-02", ...]
+  months: [],
   investments: [{ name: 'Sample Investment', currency: 'USD', values: {} }],
-  fx: {},                   // {"2025-01": {USD:1, EUR:1.1, RON:0.22}, ...}
-  income: {},               // {"2025-01": 0, ...}
-  totalInvestments: {},     // {"2025-01": 0, ...}
+  fx: {},
+  income: {},
+  totalInvestments: {},
   lastViewedMonth: null
 };
 
@@ -141,11 +137,9 @@ function load(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)); }catch{ r
 function fmtUSD(v){ if(!isFinite(v)) return '$0.00'; return v.toLocaleString(undefined,{style:'currency',currency:'USD',maximumFractionDigits:2}); }
 function fmtPct(x){ if(!isFinite(x)) return '0.00%'; return (x*100).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})+'%'; }
 function classForDelta(x){ return x>0 ? 'good' : (x<0 ? 'bad' : ''); }
-
 function yyyymm(d){ return d.toISOString().slice(0,7); }
-function prevMonthStr(m){ const [y,mo]=m.split('-').map(Number); const d=new Date(y, mo-2, 1); return d.toISOString().slice(0,7); }
+function prevMonthStr(m){ if(!m) return ''; const [y,mo]=m.split('-').map(Number); const d=new Date(y, mo-2, 1); return d.toISOString().slice(0,7); }
 
-// Ensure a month exists with baseline FX = {USD:1}
 function ensureMonth(month){
   if(!state.months.includes(month)){ state.months.push(month); state.months.sort(); }
   state.fx[month] = Object.assign({USD:1}, state.fx[month]||{});
@@ -154,7 +148,6 @@ function ensureMonth(month){
   state.totalInvestments[month] = state.totalInvestments[month] ?? 0;
 }
 
-// Compute totals per month in USD
 function totalsUSD(){
   const totals={};
   for(const m of state.months){
@@ -175,6 +168,7 @@ function monthMoM(m, series){
   return (cur/prev - 1);
 }
 function monthYTD(m, series){
+  if(!m) return 0;
   const y=m.slice(0,4);
   const baseMonth = (y-1) + '-12';
   const baseVal = series[baseMonth];
@@ -201,12 +195,11 @@ function computeBestWorst(m){
   return bp+"<br>"+wp;
 }
 
-// ====== UI Rendering ======
+// ====== UI ======
 const tbl = document.getElementById('dataTable');
 
 function renderTable(){
   const months = [...state.months].sort();
-
   let thead = `<thead><tr>`
     + `<th>Investment</th><th>Currency</th>`
     + months.map(m=>`<th>${m}</th>`).join('')
@@ -220,12 +213,10 @@ function renderTable(){
     let row = `<tr>`;
     row += `<td><input value="${inv.name}" data-field="name" data-id="${inv._id||assignId(inv)}"/></td>`;
     row += `<td><select data-field="currency" data-id="${inv._id}">${DEFAULT_CURRENCIES.map(c=>`<option value="${c}" ${inv.currency===c?'selected':''}>${c}</option>`).join('')}</select></td>`;
-
     for(const m of months){
       const val = inv.values[m] ?? '';
       row += `<td><input type="number" step="0.01" placeholder="0.00" value="${val}" data-field="cell" data-month="${m}" data-id="${inv._id}" class="mono"></td>`;
     }
-
     const m = months[months.length-1];
     if(m){
       const cur = Number(inv.values[m]||0) * Number(state.fx[m]?.[inv.currency]||0);
@@ -240,31 +231,29 @@ function renderTable(){
     } else {
       row += `<td class="mono">0.00%</td><td class="mono">0.00%</td>`;
     }
-
     row += `</tr>`;
     body += row;
   }
 
-  // Totals row (auto) in USD
-  let totalRow = `<tr>`
-    + `<td><span class="muted">Total (USD)</span></td>`
-    + `<td class="mono">USD</td>`
-    + months.map(m=>`<td class="mono">${fmtUSD(totalsPerMonth[m]||0)}</td>`).join('')
-    + (()=>{
-        const m = months[months.length-1];
-        if(!m) return `<td class="mono">0.00%</td><td class="mono">0.00%</td>`;
-        const mom = monthMoM(m, totalsPerMonth);
-        const ytd = monthYTD(m, totalsPerMonth);
-        const momHtml = mom>=0?fmtPct(mom):`(${fmtPct(-mom)})`;
-        const ytdHtml = ytd>=0?fmtPct(ytd):`(${fmtPct(-ytd)})`;
-        return `<td class="mono ${classForDelta(mom)}">${momHtml}</td><td class="mono ${classForDelta(ytd)}">${ytdHtml}</td>`;
-      })()
-    + `</tr>`;
+  // Total row
+  const months2 = [...state.months].sort();
+  const totals = totalsPerMonth;
+  const mLast = months2[months2.length-1];
+  const mom = mLast ? monthMoM(mLast, totals) : 0;
+  const ytd = mLast ? monthYTD(mLast, totals) : 0;
 
-  body += totalRow + '</tbody>';
+  body += `<tr>
+    <td><span class="muted">Total (USD)</span></td>
+    <td class="mono">USD</td>
+    ${months2.map(m=>`<td class="mono">${fmtUSD(totals[m]||0)}</td>`).join('')}
+    <td class="mono ${classForDelta(mom)}">${mom>=0?fmtPct(mom):`(${fmtPct(-mom)})`}</td>
+    <td class="mono ${classForDelta(ytd)}">${ytd>=0?fmtPct(ytd):`(${fmtPct(-ytd)})`}</td>
+  </tr>`;
 
+  body += '</tbody>';
   tbl.innerHTML = thead + body;
-  renderMonthFooter(months);
+
+  renderMonthFooter(months2);
 }
 
 function renderMonthFooter(months){
@@ -276,14 +265,15 @@ function renderMonthFooter(months){
   const fx = state.fx[last]||{USD:1,EUR:0,RON:0};
   const inc = state.income[last]||0;
   const totInv = state.totalInvestments[last]||0;
+
   el.innerHTML = `
     <div class="row" style="align-items:flex-end">
       <div class="card" style="flex:1 1 260px">
         <h3 class="sub">Edit Month</h3>
         <div class="toolbar">
           <label>Selected: <b>${last}</b></label>
-          <button id="btnPickMonth">Change…</button>
-          <button id="btnRemoveMonth" class="right">Remove Month</button>
+          <button id="btnPickMonth" type="button">Change…</button>
+          <button id="btnRemoveMonth" type="button" class="right">Remove Month</button>
         </div>
       </div>
       <div class="card" style="flex:2 1 360px">
@@ -292,7 +282,7 @@ function renderMonthFooter(months){
           <label>USD</label><input type="number" step="0.0001" id="fxUSD" value="${fx.USD??1}">
           <label>EUR</label><input type="number" step="0.0001" id="fxEUR" value="${fx.EUR??0}">
           <label>RON</label><input type="number" step="0.0001" id="fxRON" value="${fx.RON??0}">
-          <button id="btnSaveFX">Save FX</button>
+          <button id="btnSaveFX" type="button">Save FX</button>
         </div>
       </div>
       <div class="card" style="flex:2 1 360px">
@@ -300,11 +290,12 @@ function renderMonthFooter(months){
         <div class="toolbar">
           <label>Income</label><input type="number" step="0.01" id="incVal" value="${inc}">
           <label>Total Investments</label><input type="number" step="0.01" id="totInvVal" value="${totInv}">
-          <button id="btnSaveIncome">Save</button>
+          <button id="btnSaveIncome" type="button">Save</button>
         </div>
       </div>
     </div>`;
 
+  // Footer handlers
   document.getElementById('btnPickMonth').onclick = ()=>{
     const m = prompt('Enter month as YYYY-MM'); if(!m) return; if(!/^\d{4}-\d{2}$/.test(m)) return alert('Format must be YYYY-MM'); ensureMonth(m); state.lastViewedMonth=m; save(); renderAll();
   };
@@ -330,7 +321,6 @@ function renderMonthFooter(months){
 
 function assignId(inv){ inv._id = inv._id || Math.random().toString(36).slice(2,9); return inv._id; }
 
-// Handle inputs inside table
 tbl.addEventListener('change', (e)=>{
   const t=e.target; const id=t.getAttribute('data-id'); const field=t.getAttribute('data-field');
   const inv = state.investments.find(x=>x._id===id);
@@ -344,7 +334,7 @@ tbl.addEventListener('change', (e)=>{
   save(); renderAll();
 });
 
-// Add Month / Investment
+// Top toolbar handlers
 document.getElementById('btnAddMonth').onclick = ()=>{
   let m = prompt('Add month (YYYY-MM)');
   if(!m) return; if(!/^\d{4}-\d{2}$/.test(m)) return alert('Format must be YYYY-MM');
@@ -356,8 +346,6 @@ document.getElementById('btnAddInvestment').onclick = ()=>{
   state.investments.push({name, currency: (['USD','EUR','RON'].includes(currency.toUpperCase())?currency.toUpperCase():'USD'), values:{}});
   save(); renderAll();
 };
-
-// Export / Import JSON
 document.getElementById('btnExport').onclick = ()=>{
   const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='portfolio.json'; a.click(); URL.revokeObjectURL(a.href);
@@ -373,19 +361,18 @@ document.getElementById('btnClear').onclick=()=>{ if(confirm('Clear all local da
 // ---- Excel/CSV Import (SheetJS) ----
 const btnImportX = document.getElementById('btnImportX');
 const fileX = document.getElementById('fileXLSX');
-if(btnImportX && fileX){
-  btnImportX.onclick = ()=> fileX.click();
-  fileX.addEventListener('change', async (e)=>{
-    const f=e.target.files[0]; if(!f) return;
-    const data = await f.arrayBuffer();
-    let wb; try{ wb = XLSX.read(data, {type:'array'}); }catch(err){ alert('Failed to read file'); return; }
-    const wsname = wb.SheetNames[0];
-    const ws = wb.Sheets[wsname];
-    const arr = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:''});
-    try{ importFrom2D(arr); alert('Import complete! Review FX and savings inputs per month.'); }catch(err){ console.error(err); alert('Import error: '+err.message); }
-    save(); renderAll();
-  });
-}
+btnImportX.onclick = ()=> fileX.click();
+fileX.addEventListener('change', async (e)=>{
+  const f=e.target.files[0]; if(!f) return;
+  const data = await f.arrayBuffer();
+  let wb; try{ wb = XLSX.read(data, {type:'array'}); }catch(err){ alert('Failed to read file'); return; }
+  const wsname = wb.SheetNames[0];
+  const ws = wb.Sheets[wsname];
+  const arr = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:''});
+  try{ importFrom2D(arr); alert('Import complete! Review FX and savings inputs per month.'); }catch(err){ console.error(err); alert('Import error: '+err.message); }
+  save(); renderAll();
+});
+
 function importFrom2D(rows){
   const MONTH_NAMES = ['january','february','march','april','may','june','july','august','september','october','november','december','jan','feb','mar','apr','may','jun','jul','aug','sep','sept','oct','nov','dec'];
   const isMonthWord = (s)=> MONTH_NAMES.includes(String(s).trim().toLowerCase());
@@ -396,20 +383,20 @@ function importFrom2D(rows){
     if(count>=3){ headerRowIdx=r; break; }
   }
   if(headerRowIdx<0) throw new Error('Could not find header row with months.');
-  const headerRow = rows[headerRowIdx];
 
+  const headerRow = rows[headerRowIdx];
   let months=[]; let curYear=null; let lastMonthNum=null;
-  for(let c=1;c<headerRow.length;c++){ // assume col0 is investment name
+  for(let c=1;c<headerRow.length;c++){
     const cell = String(headerRow[c]||'').trim();
     if(!cell) continue;
     if(isYear(cell)){ curYear = Number(cell); continue; }
-    let yymm = null;
+    let yymm=null;
     if(/^\d{4}-\d{2}$/.test(cell)){
-      yymm = cell; curYear = Number(cell.slice(0,4)); lastMonthNum = Number(cell.slice(5,7));
+      yymm=cell; curYear=Number(cell.slice(0,4)); lastMonthNum=Number(cell.slice(5,7));
     } else if(isMonthWord(cell)){
       if(curYear==null){ curYear = Number(prompt('Enter starting year for month header "'+cell+'" (e.g., 2023):', new Date().getFullYear())); }
       const idx = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(cell.slice(0,3).toLowerCase());
-      let mnum = idx+1; if(lastMonthNum!=null && mnum<lastMonthNum){ curYear++; } lastMonthNum = mnum;
+      let mnum=idx+1; if(lastMonthNum!=null && mnum<lastMonthNum){ curYear++; } lastMonthNum=mnum;
       yymm = curYear + '-' + String(mnum).padStart(2,'0');
     }
     if(yymm) months.push({col:c, key:yymm});
@@ -418,31 +405,32 @@ function importFrom2D(rows){
 
   const investments=[];
   for(let r=headerRowIdx+1; r<rows.length; r++){
-    const name = String(rows[r][0]||'').trim();
+    const name=String(rows[r][0]||'').trim();
     if(!name) continue;
     if(/^total/i.test(name) || /^ytd/i.test(name)) break;
     const inv={ name, currency: guessCurrency(rows[r], months), values:{} };
     months.forEach(({col,key})=>{
-      const raw = String(rows[r][col]||'').trim();
-      const num = parseMoney(raw);
+      const raw=String(rows[r][col]||'').trim();
+      const num=parseMoney(raw);
       if(num!=null) inv.values[key]=num;
     });
     investments.push(inv);
   }
 
-  state.investments = investments.map(x=>({ ...x, _id: Math.random().toString(36).slice(2,9) }));
+  state.investments = investments.map(x=>({...x,_id:Math.random().toString(36).slice(2,9)}));
   state.months = months.map(m=>m.key).sort();
-  state.fx = {}; state.income={}; state.totalInvestments={};
-  state.months.forEach(m=>{ state.fx[m] = {USD:1, EUR:0, RON:0}; state.income[m]=0; state.totalInvestments[m]=0; });
+  state.fx={}; state.income={}; state.totalInvestments={};
+  state.months.forEach(m=>{ state.fx[m]={USD:1,EUR:0,RON:0}; state.income[m]=0; state.totalInvestments[m]=0; });
 }
+
 function parseMoney(s){
-  if(s===undefined || s===null) return null;
-  s = String(s).replace(/RON|EUR|USD|lei|\$/gi,'').replace(/\u20ac/g,'').replace(/[,\s]/g,'');
-  if(s==='') return null; const v = Number(s); return isFinite(v)?v:null;
+  if(s===undefined||s===null) return null;
+  s=String(s).replace(/RON|EUR|USD|lei|\$/gi,'').replace(/\u20ac/g,'').replace(/[,\s]/g,'');
+  if(s==='') return null; const v=Number(s); return isFinite(v)?v:null;
 }
 function guessCurrency(row, months){
   for(const {col} of months){
-    const raw = String(row[col]||'');
+    const raw=String(row[col]||'');
     if(!raw) continue;
     if(/[€]/.test(raw) || /EUR/i.test(raw)) return 'EUR';
     if(/RON|lei/i.test(raw)) return 'RON';
@@ -493,6 +481,8 @@ function renderAll(){ renderTable(); renderKPIs(); renderCharts(); }
 if(!state.months.length){ const m = yyyymm(new Date()); ensureMonth(m); state.lastViewedMonth=m; save(); }
 state.investments.forEach(assignId);
 renderAll();
+
+}); // DOMContentLoaded
 </script>
 </body>
 </html>
