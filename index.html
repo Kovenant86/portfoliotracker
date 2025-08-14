@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+
+<html lang="ro">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Investiții — Dashboard lunar (USD)</title>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --card: #121821;
+    --muted: #9fb0c966;
+    --text: #e8eef7;
+    --accent: #5ab0ff;
+    --accent-2: #9dffb3;
+    --danger: #ff6b6b;
+    --grid: #1a2431;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    color: var(--text);
+    background: linear-gradient(180deg, #0b0f14 0%, #0e1420 100%);
+  }
+  header {
+    position: sticky; top: 0;
+    background: rgba(11,15,20,0.8);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid #142030;
+    z-index: 5;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  h1 { margin: 0; font-size: 20px; letter-spacing: 0.2px; }
+  .sub { color: #b8c6d9; font-size: 13px; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .spacer { flex: 1; }
+  select, input[type="number"], input[type="text"] {
+    background: var(--card);
+    border: 1px solid #1f2a3b;
+    color: var(--text);
+    padding: 8px 10px; border-radius: 10px;
+    font-size: 14px;
+  }
+  button {
+    background: var(--accent);
+    color: #06223d;
+    font-weight: 700;
+    border: none; border-radius: 10px;
+    padding: 9px 12px; cursor: pointer;
+  }
+  button.ghost { background: transparent; color: var(--text); border: 1px solid #243248; }
+  button.danger { background: var(--danger); color: #2b0e0e; }
+  button.green { background: var(--accent-2); color: #103015; }
+  .card {
+    background: var(--card);
+    border: 1px solid #172234;
+    border-radius: 14px;
+    padding: 14px;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.02) inset, 0 10px 30px rgba(0,0,0,0.25);
+  }
+  .grid {
+    overflow: auto;
+    border-radius: 12px;
+    border: 1px solid #1b273a;
+  }
+  table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 900px;
+    background: var(--grid);
+  }
+  th, td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #1b273a;
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  th.sticky, td.sticky {
+    position: sticky; left: 0;
+    background: #121a27;
+    box-shadow: 2px 0 0 #1b273a;
+    z-index: 2;
+    text-align: left;
+  }
+  thead th { position: sticky; top: 0; background: #162132; z-index: 3; }
+  tfoot td { background: #101826; font-weight: 700; }
+  td input {
+    width: 110px;
+    background: #101826;
+    border: 1px solid #243248;
+    color: var(--text);
+    padding: 6px 8px; border-radius: 8px;
+  }
+  .note { font-size: 12px; color: #a9b8cd; }
+  .kpi { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .kpi .card { display: grid; gap: 6px; }
+  .kpi .value { font-size: 22px; font-weight: 800; }
+  .up { color: var(--accent-2); }
+  .down { color: var(--danger); }
+  details { border: 1px solid #1b273a; border-radius: 12px; padding: 10px 12px; background: #0f1724; }
+  details summary { cursor: pointer; font-weight: 700; }
+  .pill { font-size: 12px; padding: 4px 8px; border: 1px solid #2a3a53; border-radius: 999px; background: #101b2b; color: #c6d5ea; }
+  .muted { color: #98abc2; }
+  .small { font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+<div class="wrap row">
+<div>
+<h1>Investiții — Dashboard lunar <span class="sub">(convertit în USD)</span></h1>
+<div class="small muted">Datele se salvează automat în acest browser (localStorage).</div>
+</div>
+<div class="spacer"></div>
+<label> Anul
+        <select id="yearSelect"></select>
+</label>
+<button id="addAccountBtn">+ Cont</button>
+<button class="ghost" id="importBtn">Import</button>
+<button class="ghost" id="exportBtn">Export</button>
+<button class="danger" id="resetBtn">Reset</button><button id="unlockBtn">🔓 Deblochează</button><button id="setPwdBtn">🔒 Setează parolă</button>
+</div>
+</header>
+<main class="wrap" style="display:grid; gap:16px; margin-top:12px;">
+<section class="kpi">
+<div class="card">
+<div class="muted small">Total (USD) — <span id="kpiMonthLabel"></span></div>
+<div class="value" id="kpiTotal">—</div>
+</div>
+<div class="card">
+<div class="muted small">Diferență vs luna anterioară</div>
+<div class="value" id="kpiMoM">—</div>
+<div class="small muted" id="kpiMoMabs"></div>
+</div>
+<div class="card">
+<div class="muted small">YTD (%)</div>
+<div class="value" id="kpiYTD">—</div>
+<div class="small muted" id="kpiYTDbase"></div>
+</div>
+</section>
+<section class="card">
+<div class="row">
+<strong>Rate FX</strong>
+<span class="pill">EUR→USD</span> <input id="eurusd" placeholder="ex: 1.10" step="0.0001" type="number"/>
+<span class="pill">RON→USD</span> <input id="ronusd" placeholder="ex: 0.22" step="0.0001" type="number"/>
+<span class="spacer"></span>
+<label class="small"><input id="autoFx" type="checkbox"/> Autocompletează din internet (exchangerate.host)</label>
+<button class="green small" id="refreshFx">Actualizează pentru anul curent</button>
+</div>
+<div class="note">Poți seta rate fixe (se aplică tuturor lunilor fără rată dedicată) sau poți activa completarea automată pentru fiecare lună, în funcție de data ultimei zile din lună. Pentru USD, rata este 1.0000.</div>
+</section>
+<section class="grid">
+<table id="table">
+<thead>
+<tr>
+<th class="sticky">Cont</th>
+<th>Monedă</th>
+<th>Ian</th><th>Feb</th><th>Mar</th><th>Apr</th><th>Mai</th><th>Iun</th><th>Iul</th><th>Aug</th><th>Sep</th><th>Oct</th><th>Nov</th><th>Dec</th>
+<th>Acțiuni</th>
+</tr>
+</thead>
+<tbody id="tbody">
+<!-- Rows injected -->
+</tbody>
+<tfoot>
+<tr>
+<td class="sticky"><strong>Total USD</strong></td>
+<td></td>
+<td id="tot0"></td><td id="tot1"></td><td id="tot2"></td><td id="tot3"></td><td id="tot4"></td><td id="tot5"></td>
+<td id="tot6"></td><td id="tot7"></td><td id="tot8"></td><td id="tot9"></td><td id="tot10"></td><td id="tot11"></td>
+<td></td>
+</tr>
+</tfoot>
+</table>
+</section>
+<details>
+<summary>Ajutor &amp; definții</summary>
+<ul class="small">
+<li><strong>MoM</strong> = Total(USD) luna curentă − luna anterioară; % = raportul la luna anterioară.</li>
+<li><strong>YTD%</strong> = (Total(USD) luna curentă ÷ Baza YTD − 1) × 100. Baza YTD este totalul din decembrie anul anterior; dacă lipsește, se folosește prima lună nenulă din anul curent.</li>
+<li>Click pe numele contului pentru a-l edita. Valori și monedă se pot schimba oricând.</li>
+<li>Datele se păstrează în <em>localStorage</em>. Folosește Export/Import pentru backup sau transfer.</li>
+</ul>
+</details>
+</main>
+<script>
+(function(){
+  const $ = (sel) => document.querySelector(sel);
+  const months = ["Ian","Feb","Mar","Apr","Mai","Iun","Iul","Aug","Sep","Oct","Nov","Dec"];
+  const storeKey = "invest_dash_v1";
+
+  function defaultState(){
+    const y = new Date().getFullYear();
+    return {
+      year: y,
+      accounts: [
+        // { id, name, ccy, values: { "YYYY": [12 numbers] } }
+      ],
+      fx: {
+        fixed: { EUR: 1.10, RON: 0.22, USD: 1.00 }, // editable
+        perMonth: { /* "YYYY": { "EUR":[...], "RON":[...], "USD":[1,...]} */ },
+        auto: false
+      }
+    };
+  }
+
+  function load(){ try {
+    return JSON.parse(localStorage.getItem(storeKey)) || defaultState();
+  } catch(e){ return defaultState(); } }
+
+  function save(){ localStorage.setItem(storeKey, JSON.stringify(state)); }
+
+  let state = load();
+
+  // Year select
+  function fillYearSelect(){
+    const now = new Date().getFullYear();
+    const sel = $("#yearSelect");
+    sel.innerHTML = "";
+    for(let y = now-5; y <= now+1; y++){
+      const opt = document.createElement("option");
+      opt.value = y; opt.textContent = y;
+      if(y === state.year) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    sel.onchange = () => { state.year = parseInt(sel.value,10); save(); renderAll();
+  if (typeof setLockedUI === 'function') { setLockedUI(__lockedMode || false); } }
+  }
+
+  // Accounts
+  function addAccount(name="Cont nou", ccy="USD"){
+    const id = crypto.randomUUID();
+    const acc = { id, name, ccy, values: {} };
+    acc.values[state.year] = Array(12).fill(null);
+    state.accounts.push(acc);
+    save(); renderTable();
+  }
+
+  function removeAccount(id){
+    state.accounts = state.accounts.filter(a => a.id !== id);
+    save(); renderAll();
+  if (typeof setLockedUI === 'function') { setLockedUI(__lockedMode || false); }
+  }
+
+  function ensureYearArrays(){
+    for(const acc of state.accounts){
+      if(!acc.values[state.year]) acc.values[state.year] = Array(12).fill(null);
+    }
+    const y = String(state.year);
+    state.fx.perMonth[y] = state.fx.perMonth[y] || {};
+    state.fx.perMonth[y].USD = Array(12).fill(1.0);
+    save();
+  }
+
+  // FX helpers
+  function getFxForMonth(ccy, mIndex){
+    const y = String(state.year);
+    const perM = state.fx.perMonth[y] && state.fx.perMonth[y][ccy];
+    if(perM && perM[mIndex]) return perM[mIndex];
+    // fallback to fixed
+    return (state.fx.fixed && state.fx.fixed[ccy]) || (ccy==="USD" ? 1 : null);
+  }
+
+  async function fetchFxForYear(){
+    const y = state.year;
+    state.fx.perMonth[String(y)] = state.fx.perMonth[String(y)] || {};
+    const per = state.fx.perMonth[String(y)];
+    const wanted = ["EUR","RON"];
+    for(let m=0;m<12;m++){
+      const lastDay = new Date(y, m+1, 0); // last day of month
+      const d = lastDay.toISOString().slice(0,10);
+      try {
+        // exchangerate.host allows historical: https://api.exchangerate.host/2024-01-31?base=USD&symbols=EUR,RON
+        const url = `https://api.exchangerate.host/${d}?base=USD&symbols=EUR,RON`;
+        const res = await fetch(url);
+        if(!res.ok) throw new Error("HTTP "+res.status);
+        const data = await res.json();
+        // data.rates: EUR (USD->EUR). We need EUR->USD. If base=USD, rates.EUR = 0.93 => 1 EUR = 1/0.93 USD
+        wanted.forEach(ccy=>{
+          if(!per[ccy]) per[ccy] = Array(12).fill(null);
+          if(data && data.rates && data.rates[ccy]){
+            const usdPerCcy = 1 / data.rates[ccy];
+            per[ccy][m] = usdPerCcy;
+          }
+        });
+        per["USD"] = Array(12).fill(1.0);
+      } catch(e){
+        console.warn("FX fetch failed for", d, e);
+      }
+    }
+    save(); renderAll();
+  if (typeof setLockedUI === 'function') { setLockedUI(__lockedMode || false); }
+  }
+
+  // Rendering
+  function renderTable(){
+    ensureYearArrays();
+    const tbody = $("#tbody");
+    tbody.innerHTML = "";
+    for(const acc of state.accounts){
+      const tr = document.createElement("tr");
+
+      // Name (editable)
+      const tdName = document.createElement("td"); tdName.className="sticky";
+      const nameBtn = document.createElement("button");
+      nameBtn.textContent = acc.name;
+      nameBtn.className = "ghost";
+      nameBtn.onclick = () => {
+        const v = prompt("Nume cont:", acc.name) || acc.name;
+        acc.name = v;
+        save(); renderTable();
+      };
+      tdName.appendChild(nameBtn);
+      tr.appendChild(tdName);
+
+      // Currency select
+      const tdCcy = document.createElement("td");
+      const sel = document.createElement("select");
+      ["USD","EUR","RON"].forEach(c=>{
+        const o = document.createElement("option");
+        o.value = c; o.textContent = c;
+        if(acc.ccy === c) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.onchange = () => { acc.ccy = sel.value; save(); renderAll();
+  if (typeof setLockedUI === 'function') { setLockedUI(__lockedMode || false); } };
+      tdCcy.appendChild(sel);
+      tr.appendChild(tdCcy);
+
+      // Month inputs
+      const vals = acc.values[state.year] || Array(12).fill(null);
+      for(let i=0;i<12;i++){
+        const td = document.createElement("td");
+        const inp = document.createElement("input");
+        inp.type = "number"; inp.step = "0.01"; inp.placeholder = "0";
+        if(vals[i] !== null) inp.value = vals[i];
+        inp.onchange = () => {
+          const num = inp.value === "" ? null : parseFloat(inp.value);
+          acc.values[state.year][i] = (isNaN(num) ? null : num);
+          save(); renderAll();
+  if (typeof setLockedUI === 'function') { setLockedUI(__lockedMode || false); }
+        };
+        td.appendChild(inp);
+        tr.appendChild(td);
+      }
+
+      // Actions
+      const tdAct = document.createElement("td");
+      const del = document.createElement("button");
+      del.textContent = "Șterge";
+      del.className = "danger";
+      del.onclick = () => { if(confirm("Ștergi contul?")) removeAccount(acc.id); };
+      tdAct.appendChild(del);
+      tr.appendChild(tdAct);
+
+      tbody.appendChild(tr);
+    }
+
+    // Totals row (per month in USD)
+    const totals = calcTotalsPerMonthUSD();
+    totals.forEach((v, i) => $("#tot"+i).textContent = v === 0 ? "—" : formatUSD(v));
+  }
+
+  function formatUSD(x){
+    return x.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+  }
+
+  function calcTotalsPerMonthUSD(){
+    const arr = Array(12).fill(0);
+    for(const acc of state.accounts){
+      const vals = acc.values[state.year] || [];
+      for(let m=0;m<12;m++){
+        const val = vals[m];
+        if(val !== null && val !== undefined && val !== ""){
+          const fx = getFxForMonth(acc.ccy, m);
+          const usd = (fx ? val * fx : null);
+          if(usd !== null) arr[m] += usd;
+        }
+      }
+    }
+    return arr;
+  }
+
+  function firstNonZeroIndex(a){ for(let i=0;i<a.length;i++){ if(a[i] && a[i]!==0) return i; } return -1; }
+
+  function renderKpis(){
+    const y = state.year;
+    const totals = calcTotalsPerMonthUSD();
+    // current month = last month with data this year or current calendar month if empty
+    let lastIdx = -1;
+    for(let i=11;i>=0;i--){
+      if(totals[i] && totals[i]!==0){ lastIdx = i; break; }
+    }
+    if(lastIdx === -1){
+      const now = new Date();
+      if(now.getFullYear() === y) lastIdx = now.getMonth();
+      else lastIdx = 0;
+    }
+
+    $("#kpiMonthLabel").textContent = months[lastIdx] + " " + y;
+    const cur = totals[lastIdx] || 0;
+    const prev = lastIdx>0 ? (totals[lastIdx-1] || 0) : 0;
+    const momAbs = cur - prev;
+    const momPct = prev === 0 ? null : (momAbs / prev * 100);
+    $("#kpiTotal").textContent = formatUSD(cur);
+    $("#kpiMoM").textContent = (momPct === null) ? "—" :
+      (momPct>=0?"+":"") + momPct.toFixed(2) + "%";
+    $("#kpiMoM").className = "value " + (momAbs>=0 ? "up":"down");
+    $("#kpiMoMabs").textContent = (prev===0) ? "N/A (nu există bază)"
+      : `${momAbs>=0?"+":""}${formatUSD(momAbs)} vs ${months[lastIdx-1]}`;
+
+    // YTD: base = Dec previous year total if exists, else first non-zero this year
+    const prevYearTotals = totalsOfYearUSD(y-1);
+    const base = (prevYearTotals && prevYearTotals[11]) ? prevYearTotals[11] : (()=>{
+      const idx = firstNonZeroIndex(totals);
+      return idx>=0 ? totals[idx] : 0;
+    
+// === Security: client-side encryption (AES-GCM + PBKDF2) ===
+let __lockedMode = false;         // true when localStorage holds encrypted payload
+let __sessionPassword = null;     // set after successful unlock; used to keep data encrypted at rest
+let __encryptedPayload = null;    // the raw encrypted object from storage when locked
+
+const sec = {
+  kdf: 'PBKDF2',
+  hash: 'SHA-256',
+  iterations: 200000,
+  saltBytes: 16,
+  ivBytes: 12
+};
+
+// b64 helpers
+function b64enc(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+function b64dec(str){
+  const bin = atob(str); const out = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) out[i] = bin.charCodeAt(i);
+  return out.buffer;
+}
+
+async function deriveKey(password, salt){
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2', hash: sec.hash, salt, iterations: sec.iterations},
+    keyMaterial,
+    {name:'AES-GCM', length: 256},
+    false,
+    ['encrypt','decrypt']
+  );
+}
+
+async function encryptPayload(plaintext, password, saltOpt){
+  const salt = saltOpt || crypto.getRandomValues(new Uint8Array(sec.saltBytes)).buffer;
+  const iv = crypto.getRandomValues(new Uint8Array(sec.ivBytes)).buffer;
+  const key = await deriveKey(password, salt);
+  const enc = new TextEncoder();
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, enc.encode(plaintext));
+  return {
+    enc: true,
+    alg: 'AES-GCM',
+    kdf: sec.kdf,
+    hash: sec.hash,
+    iter: sec.iterations,
+    salt: b64enc(salt),
+    iv: b64enc(iv),
+    data: b64enc(ct),
+    note: 'Nu uita parola. Fără parolă, datele NU pot fi recuperate.'
+  };
+}
+
+async function decryptPayload(wrapper, password){
+  const salt = b64dec(wrapper.salt);
+  const iv = b64dec(wrapper.iv);
+  const key = await deriveKey(password, salt);
+  const ct = b64dec(wrapper.data);
+  const ptBuf = await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, ct);
+  return new TextDecoder().decode(ptBuf);
+}
+
+// Override load/save to support encryption-at-rest
+const __origLoad = load;
+const __origSave = save;
+
+function isEncrypted(obj){
+  return obj && typeof obj === 'object' && obj.enc === true && obj.alg === 'AES-GCM';
+}
+
+function setLockedUI(on){
+  const ov = document.getElementById('lockOverlay');
+  if(on){ ov.style.display = 'grid'; }
+  else { ov.style.display = 'none'; }
+  // Toggle header buttons
+  document.getElementById('unlockBtn').style.display = on ? 'inline-block' : 'none';
+  document.getElementById('setPwdBtn').style.display = on ? 'none' : 'inline-block';
+  // Disable main controls when locked
+  [...document.querySelectorAll('button, input, select')].forEach(el=>{
+    if(el.id === 'unlockBtn' || el.id === 'setPwdBtn') return;
+    el.disabled = on;
+  });
+}
+
+// Replace load() so that if storage holds encrypted data, we don't expose it
+function loadEncryptedAware(){
+  try {
+    const raw = localStorage.getItem(storeKey);
+    if(!raw) return defaultState();
+    const parsed = JSON.parse(raw);
+    if(isEncrypted(parsed)){
+      __lockedMode = true;
+      __encryptedPayload = parsed;
+      setLockedUI(true);
+      // return a harmless default so the UI can render
+      return defaultState();
+    } else {
+      __lockedMode = false;
+      setLockedUI(false);
+      return parsed;
+    }
+  } catch(e){
+    return defaultState();
+  }
+}
+
+// Replace save() so that we always keep data encrypted at rest when a session password exists
+async function saveEncryptedAware(){
+  if(__sessionPassword){
+    try {
+      const existing = __encryptedPayload;
+      const salt = existing ? b64dec(existing.salt) : null;
+      const wrapper = await encryptPayload(JSON.stringify(state), __sessionPassword, salt);
+      localStorage.setItem(storeKey, JSON.stringify(wrapper));
+      __encryptedPayload = wrapper;
+    } catch(e){
+      console.error('Encrypt+save failed', e);
+    }
+  } else {
+    // No session password -> store plaintext (legacy mode)
+    localStorage.setItem(storeKey, JSON.stringify(state));
+  }
+}
+
+// Wire our overrides
+load = loadEncryptedAware;
+save = function(){ saveEncryptedAware(); };
+
+// Header buttons behaviour
+document.addEventListener('DOMContentLoaded', ()=>{
+  const btnSet = document.getElementById('setPwdBtn');
+  const btnUnl = document.getElementById('unlockBtn');
+
+  btnSet?.addEventListener('click', async ()=>{
+    const p1 = prompt('Alege o parolă pentru criptarea datelor:');
+    if(!p1) return;
+    const p2 = prompt('Repetă parola:');
+    if(p1 !== p2){ alert('Parolele nu coincid.'); return; }
+    __sessionPassword = p1;
+    __lockedMode = false;
+    setLockedUI(false);
+    await saveEncryptedAware();
+    alert('Parola setată. Datele vor rămâne criptate la export și în localStorage.');
+  });
+
+  btnUnl?.addEventListener('click', async ()=>{
+    if(!__encryptedPayload){ alert('Nu există date criptate.'); return; }
+    const p = prompt('Introdu parola pentru a debloca datele:');
+    if(!p) return;
+    try {
+      const plaintext = await decryptPayload(__encryptedPayload, p);
+      state = JSON.parse(plaintext);
+      __sessionPassword = p;      // keep encrypting at rest during this session
+      __lockedMode = false;
+      setLockedUI(false);
+      renderAll();
+  if (typeof setLockedUI === 'function') { setLockedUI(__lockedMode || false); }
+      alert('Deblocat cu succes. Datele rămân criptate la restare.');
+    } catch(e){
+      console.error(e);
+      alert('Parolă greșită sau date corupte.');
+    }
+  });
+});
+
+// Export/Import aware of encryption
+const __origExport = document.getElementById("exportBtn").onclick;
+document.getElementById("exportBtn").onclick = async ()=>{
+  if(__sessionPassword || __encryptedPayload){
+    const wrapper = __encryptedPayload || await encryptPayload(JSON.stringify(state), __sessionPassword);
+    const data = JSON.stringify(wrapper, null, 2);
+    const blob = new Blob([data], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "investitii_backup_encrypted.json";
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  } else {
+    // legacy plaintext export
+    const data = JSON.stringify(state, null, 2);
+    const blob = new Blob([data], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "investitii_backup.json";
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  }
+};
+
+const __origImport = document.getElementById("importBtn").onclick;
+document.getElementById("importBtn").onclick = ()=>{
+  const inp = document.createElement("input"); inp.type="file"; inp.accept=".json,application/json";
+  inp.onchange = async () => {
+    const file = inp.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if(isEncrypted(data)){
+          // prompt for password and decrypt
+          const p = prompt('Acest backup este criptat. Introdu parola pentru import:');
+          if(!p) return;
+          const plaintext = await decryptPayload(data, p);
+          state = JSON.parse(plaintext);
+          __sessionPassword = p;       // keep encryption on-going
+          __encryptedPayload = data;   // remember envelope (salt/iter) for future saves
+          __lockedMode = false;
+          setLockedUI(false);
+          renderAll();
+  if (typeof setLockedUI === 'function') { setLockedUI(__lockedMode || false); } saveEncryptedAware();
+          alert('Import criptat reușit.');
+        } else {
+          // plaintext import
+          state = data; renderAll();
+  if (typeof setLockedUI === 'function') { setLockedUI(__lockedMode || false); }
+          if(__sessionPassword){
+            // if current session has a password, persist encrypted
+            await saveEncryptedAware();
+          } else {
+            localStorage.setItem(storeKey, JSON.stringify(state));
+          }
+          alert('Import reușit.');
+        }
+      } catch(e){ alert('Import invalid: ' + e.message); }
+    };
+    reader.readAsText(file);
+  };
+  inp.click();
+};
+
+})();
+    const ytdPct = base===0 ? null : ((cur/base)-1)*100;
+    $("#kpiYTD").textContent = (ytdPct===null) ? "—" : (ytdPct>=0?"+":"") + ytdPct.toFixed(2) + "%";
+    $("#kpiYTD").className = "value " + ((ytdPct||0)>=0 ? "up" : "down");
+    $("#kpiYTDbase").textContent = "Bază: " + (base===0 ? "N/A" : formatUSD(base));
+  }
+
+  function totalsOfYearUSD(y){
+    const bakYear = state.year;
+    state.year = y;
+    const res = calcTotalsPerMonthUSD();
+    state.year = bakYear;
+    return res;
+  }
+
+  function renderFxControls(){
+    $("#eurusd").value = state.fx.fixed.EUR ?? "";
+    $("#ronusd").value = state.fx.fixed.RON ?? "";
+    $("#autoFx").checked = !!state.fx.auto;
+  }
+
+  function renderAll(){
+    renderTable();
+    renderKpis();
+    renderFxControls();
+  }
+
+  // Wire controls
+  $("#addAccountBtn").onclick = () => {
+    const name = prompt("Nume cont (ex: IBKR)") || "Cont nou";
+    const ccy = prompt("Monedă (USD/EUR/RON)", "USD") || "USD";
+    addAccount(name.toUpperCase(), (ccy || "USD").toUpperCase());
+  };
+  $("#exportBtn").onclick = () => {
+    const data = JSON.stringify(state, null, 2);
+    const blob = new Blob([data], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "investitii_backup.json"; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  };
+  $("#importBtn").onclick = () => {
+    const inp = document.createElement("input"); inp.type="file"; inp.accept=".json,application/json";
+    inp.onchange = () => {
+      const file = inp.files[0]; if(!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+          state = data; save(); renderAll();
+  if (typeof setLockedUI === 'function') { setLockedUI(__lockedMode || false); }
+        } catch(e){ alert("Import invalid: " + e.message); }
+      };
+      reader.readAsText(file);
+    };
+    inp.click();
+  };
+  $("#resetBtn").onclick = () => {
+    if(confirm("Resetezi toate datele?")){ localStorage.removeItem(storeKey); state = defaultState(); renderAll();
+  if (typeof setLockedUI === 'function') { setLockedUI(__lockedMode || false); } }
+  };
+  $("#eurusd").onchange = (e)=>{ state.fx.fixed.EUR = parseFloat(e.target.value)||null; save(); renderAll();
+  if (typeof setLockedUI === 'function') { setLockedUI(__lockedMode || false); } };
+  $("#ronusd").onchange = (e)=>{ state.fx.fixed.RON = parseFloat(e.target.value)||null; save(); renderAll();
+  if (typeof setLockedUI === 'function') { setLockedUI(__lockedMode || false); } };
+  $("#autoFx").onchange = (e)=>{ state.fx.auto = !!e.target.checked; save(); };
+  $("#refreshFx").onclick = async ()=>{
+    if(!state.fx.auto){ alert("Bifează întâi 'Autocompletează din internet' pentru a prelua cotațiile."); return; }
+    $("#refreshFx").disabled = true; $("#refreshFx").textContent = "Se actualizează...";
+    await fetchFxForYear();
+    $("#refreshFx").disabled = false; $("#refreshFx").textContent = "Actualizează pentru anul curent";
+  };
+
+  // Initial
+  fillYearSelect();
+  renderAll();
+  if (typeof setLockedUI === 'function') { setLockedUI(__lockedMode || false); }
+
+// === Security: client-side encryption (AES-GCM + PBKDF2) ===
+let __lockedMode = false;         // true when localStorage holds encrypted payload
+let __sessionPassword = null;     // set after successful unlock; used to keep data encrypted at rest
+let __encryptedPayload = null;    // the raw encrypted object from storage when locked
+
+const sec = {
+  kdf: 'PBKDF2',
+  hash: 'SHA-256',
+  iterations: 200000,
+  saltBytes: 16,
+  ivBytes: 12
+};
+
+// b64 helpers
+function b64enc(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+function b64dec(str){
+  const bin = atob(str); const out = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) out[i] = bin.charCodeAt(i);
+  return out.buffer;
+}
+
+async function deriveKey(password, salt){
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2', hash: sec.hash, salt, iterations: sec.iterations},
+    keyMaterial,
+    {name:'AES-GCM', length: 256},
+    false,
+    ['encrypt','decrypt']
+  );
+}
+
+async function encryptPayload(plaintext, password, saltOpt){
+  const salt = saltOpt || crypto.getRandomValues(new Uint8Array(sec.saltBytes)).buffer;
+  const iv = crypto.getRandomValues(new Uint8Array(sec.ivBytes)).buffer;
+  const key = await deriveKey(password, salt);
+  const enc = new TextEncoder();
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, enc.encode(plaintext));
+  return {
+    enc: true,
+    alg: 'AES-GCM',
+    kdf: sec.kdf,
+    hash: sec.hash,
+    iter: sec.iterations,
+    salt: b64enc(salt),
+    iv: b64enc(iv),
+    data: b64enc(ct),
+    note: 'Nu uita parola. Fără parolă, datele NU pot fi recuperate.'
+  };
+}
+
+async function decryptPayload(wrapper, password){
+  const salt = b64dec(wrapper.salt);
+  const iv = b64dec(wrapper.iv);
+  const key = await deriveKey(password, salt);
+  const ct = b64dec(wrapper.data);
+  const ptBuf = await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, ct);
+  return new TextDecoder().decode(ptBuf);
+}
+
+// Override load/save to support encryption-at-rest
+const __origLoad = load;
+const __origSave = save;
+
+function isEncrypted(obj){
+  return obj && typeof obj === 'object' && obj.enc === true && obj.alg === 'AES-GCM';
+}
+
+function setLockedUI(on){
+  const ov = document.getElementById('lockOverlay');
+  if(on){ ov.style.display = 'grid'; }
+  else { ov.style.display = 'none'; }
+  // Toggle header buttons
+  document.getElementById('unlockBtn').style.display = on ? 'inline-block' : 'none';
+  document.getElementById('setPwdBtn').style.display = on ? 'none' : 'inline-block';
+  // Disable main controls when locked
+  [...document.querySelectorAll('button, input, select')].forEach(el=>{
+    if(el.id === 'unlockBtn' || el.id === 'setPwdBtn') return;
+    el.disabled = on;
+  });
+}
+
+// Replace load() so that if storage holds encrypted data, we don't expose it
+function loadEncryptedAware(){
+  try {
+    const raw = localStorage.getItem(storeKey);
+    if(!raw) return defaultState();
+    const parsed = JSON.parse(raw);
+    if(isEncrypted(parsed)){
+      __lockedMode = true;
+      __encryptedPayload = parsed;
+      setLockedUI(true);
+      // return a harmless default so the UI can render
+      return defaultState();
+    } else {
+      __lockedMode = false;
+      setLockedUI(false);
+      return parsed;
+    }
+  } catch(e){
+    return defaultState();
+  }
+}
+
+// Replace save() so that we always keep data encrypted at rest when a session password exists
+async function saveEncryptedAware(){
+  if(__sessionPassword){
+    try {
+      const existing = __encryptedPayload;
+      const salt = existing ? b64dec(existing.salt) : null;
+      const wrapper = await encryptPayload(JSON.stringify(state), __sessionPassword, salt);
+      localStorage.setItem(storeKey, JSON.stringify(wrapper));
+      __encryptedPayload = wrapper;
+    } catch(e){
+      console.error('Encrypt+save failed', e);
+    }
+  } else {
+    // No session password -> store plaintext (legacy mode)
+    localStorage.setItem(storeKey, JSON.stringify(state));
+  }
+}
+
+// Wire our overrides
+load = loadEncryptedAware;
+save = function(){ saveEncryptedAware(); };
+
+// Header buttons behaviour
+document.addEventListener('DOMContentLoaded', ()=>{
+  const btnSet = document.getElementById('setPwdBtn');
+  const btnUnl = document.getElementById('unlockBtn');
+
+  btnSet?.addEventListener('click', async ()=>{
+    const p1 = prompt('Alege o parolă pentru criptarea datelor:');
+    if(!p1) return;
+    const p2 = prompt('Repetă parola:');
+    if(p1 !== p2){ alert('Parolele nu coincid.'); return; }
+    __sessionPassword = p1;
+    __lockedMode = false;
+    setLockedUI(false);
+    await saveEncryptedAware();
+    alert('Parola setată. Datele vor rămâne criptate la export și în localStorage.');
+  });
+
+  btnUnl?.addEventListener('click', async ()=>{
+    if(!__encryptedPayload){ alert('Nu există date criptate.'); return; }
+    const p = prompt('Introdu parola pentru a debloca datele:');
+    if(!p) return;
+    try {
+      const plaintext = await decryptPayload(__encryptedPayload, p);
+      state = JSON.parse(plaintext);
+      __sessionPassword = p;      // keep encrypting at rest during this session
+      __lockedMode = false;
+      setLockedUI(false);
+      renderAll();
+  if (typeof setLockedUI === 'function') { setLockedUI(__lockedMode || false); }
+      alert('Deblocat cu succes. Datele rămân criptate la restare.');
+    } catch(e){
+      console.error(e);
+      alert('Parolă greșită sau date corupte.');
+    }
+  });
+});
+
+// Export/Import aware of encryption
+const __origExport = document.getElementById("exportBtn").onclick;
+document.getElementById("exportBtn").onclick = async ()=>{
+  if(__sessionPassword || __encryptedPayload){
+    const wrapper = __encryptedPayload || await encryptPayload(JSON.stringify(state), __sessionPassword);
+    const data = JSON.stringify(wrapper, null, 2);
+    const blob = new Blob([data], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "investitii_backup_encrypted.json";
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  } else {
+    // legacy plaintext export
+    const data = JSON.stringify(state, null, 2);
+    const blob = new Blob([data], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "investitii_backup.json";
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  }
+};
+
+const __origImport = document.getElementById("importBtn").onclick;
+document.getElementById("importBtn").onclick = ()=>{
+  const inp = document.createElement("input"); inp.type="file"; inp.accept=".json,application/json";
+  inp.onchange = async () => {
+    const file = inp.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if(isEncrypted(data)){
+          // prompt for password and decrypt
+          const p = prompt('Acest backup este criptat. Introdu parola pentru import:');
+          if(!p) return;
+          const plaintext = await decryptPayload(data, p);
+          state = JSON.parse(plaintext);
+          __sessionPassword = p;       // keep encryption on-going
+          __encryptedPayload = data;   // remember envelope (salt/iter) for future saves
+          __lockedMode = false;
+          setLockedUI(false);
+          renderAll();
+  if (typeof setLockedUI === 'function') { setLockedUI(__lockedMode || false); } saveEncryptedAware();
+          alert('Import criptat reușit.');
+        } else {
+          // plaintext import
+          state = data; renderAll();
+  if (typeof setLockedUI === 'function') { setLockedUI(__lockedMode || false); }
+          if(__sessionPassword){
+            // if current session has a password, persist encrypted
+            await saveEncryptedAware();
+          } else {
+            localStorage.setItem(storeKey, JSON.stringify(state));
+          }
+          alert('Import reușit.');
+        }
+      } catch(e){ alert('Import invalid: ' + e.message); }
+    };
+    reader.readAsText(file);
+  };
+  inp.click();
+};
+
+})();
+</script>
+<div id="lockOverlay" style="display:none; position:fixed; inset:0; background:rgba(5,8,12,0.9); backdrop-filter:blur(6px); z-index:9999;  place-items:center;"><div class="card" style="max-width:520px; text-align:center; padding:22px;">Datele sunt blocate. Apasă „Deblochează” și introdu parola pentru a continua.</div></div></body>
+</html>
