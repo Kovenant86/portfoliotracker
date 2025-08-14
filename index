@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Portfolio Dashboard</title>
+  <style>
+    :root{
+      --bg:#0b0f14; --panel:#121821; --muted:#1b2430; --text:#e6edf3; --sub:#9fb0c3; --accent:#4da3ff; --good:#36c16b; --bad:#ff5a5a; --warn:#f5b301; --card:#0f141b;
+      --border:#223047; --chip:#263447;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; background:var(--bg); color:var(--text)}
+    header{position:sticky;top:0;z-index:5;background:linear-gradient(to bottom,var(--bg),transparent)}
+    .wrap{max-width:1200px;margin:0 auto;padding:18px 16px}
+    h1{margin:2px 0 10px;font-size:22px;letter-spacing:.2px}
+    .sub{color:var(--sub);font-size:13px}
+    .row{display:flex;gap:12px;align-items:stretch;flex-wrap:wrap}
+    .card{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px}
+    .kpi{flex:1 1 210px}
+    .kpi h3{margin:0 0 8px;font-size:12px;color:var(--sub);font-weight:600;text-transform:uppercase;letter-spacing:.6px}
+    .kpi .val{font-variant-numeric:tabular-nums; font-size:26px; font-weight:650}
+    .kpi .delta{font-size:12px;margin-top:6px}
+    .good{color:var(--good)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+    .grid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+    @media(max-width:1000px){.grid{grid-template-columns:1fr}}
+    canvas{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:10px}
+    .section h2{font-size:16px;margin:10px 0 8px}
+
+    /* Table */
+    table{width:100%; border-collapse:separate; border-spacing:0 8px}
+    thead th{position:sticky; top:0; background:var(--bg); padding:6px 8px; font-size:12px; color:var(--sub); text-align:left}
+    tbody tr{background:var(--panel); border:1px solid var(--border)}
+    tbody td{padding:8px; border-top:1px solid var(--border)}
+    tbody tr:first-child td{border-top-left-radius:10px;border-top-right-radius:10px}
+    tbody tr:last-child td{border-bottom-left-radius:10px;border-bottom-right-radius:10px}
+    input, select, button{background:#0e141c; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:8px 10px; font-size:14px}
+    input[type="number"]{width:120px}
+    .mono{font-variant-numeric:tabular-nums}
+    .toolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+    .chip{background:var(--chip); border:1px solid var(--border); padding:6px 8px; border-radius:999px; font-size:12px;color:var(--sub)}
+    .pill{padding:6px 10px; border-radius:999px; background:var(--accent); border:0; color:#001225; font-weight:700}
+    .link{color:var(--accent); text-decoration:none}
+    .right{margin-left:auto}
+    .muted{color:var(--sub)}
+    .note{font-size:12px;color:var(--sub)}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Portfolio Dashboard</h1>
+      <div class="sub">Single-file, offline. Data is saved in your browser (localStorage). Host on GitHub Pages with no changes.</div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- KPIs -->
+    <section class="row">
+      <div class="card kpi">
+        <h3>Total Value (USD)</h3>
+        <div class="val mono" id="kpiTotal">$0.00</div>
+        <div class="delta" id="kpiAsOf" class="muted"></div>
+      </div>
+      <div class="card kpi">
+        <h3>MoM Change</h3>
+        <div class="val mono" id="kpiMoM">0.00%</div>
+        <div class="delta" id="kpiMoMAbs" class="muted"></div>
+      </div>
+      <div class="card kpi">
+        <h3>YTD Change</h3>
+        <div class="val mono" id="kpiYTD">0.00%</div>
+        <div class="delta" id="kpiYTDAbs" class="muted"></div>
+      </div>
+      <div class="card kpi">
+        <h3>Savings Rate (this month)</h3>
+        <div class="val mono" id="kpiSaveRate">0.00%</div>
+        <div class="delta" id="kpiIncomeInfo" class="muted"></div>
+      </div>
+      <div class="card kpi">
+        <h3>Best / Worst (MoM)</h3>
+        <div class="mono" id="kpiBestWorst">—</div>
+        <div class="note">Excludes total row; computed on USD values.</div>
+      </div>
+    </section>
+
+    <!-- Charts -->
+    <section class="grid section">
+      <div>
+        <h2>Total Value Over Time</h2>
+        <canvas id="totalChart" height="240"></canvas>
+      </div>
+      <div>
+        <h2>Monthly P&L (USD)</h2>
+        <canvas id="pnlChart" height="240"></canvas>
+      </div>
+    </section>
+
+    <!-- Controls -->
+    <section class="section">
+      <h2>Data Entry</h2>
+      <div class="toolbar" style="margin-bottom:10px">
+        <span class="chip">Months are <b>columns</b></span>
+        <button class="pill" id="btnAddMonth">+ Add Month</button>
+        <button class="pill" id="btnAddInvestment">+ Add Investment</button>
+        <span class="right"></span>
+        <button id="btnExport">Export JSON</button>
+        <input id="fileImport" type="file" accept="application/json" />
+        <button id="btnClear" title="Erase local data">Clear All</button>
+        <input id="fileXLSX" type="file" accept=".xlsx,.xls,.csv" style="display:none" />
+        <button id="btnImportX" title="Import from Excel/CSV">Import Excel/CSV</button>
+      </div>
+      <div class="note">FX is monthly (USD base): set USD=1.00, and enter USD/RON & USD/EUR as needed.</div>
+
+      <div id="tableWrap" class="card" style="overflow:auto">
+        <table id="dataTable"></table>
+      </div>
+
+      <p class="note">Savings Rate = <b>Total Investments</b> / <b>Income</b> for the selected month. If Income is 0 or empty, the rate shows 0%.</p>
+    </section>
+  </main>
+
+<script>
+// ====== Data Model (persisted in localStorage) ======
+const LS_KEY = 'pf_data_v1';
+const DEFAULT_CURRENCIES = ['USD','EUR','RON'];
+
+let state = load() || {
+  months: [], // ["2025-01", "2025-02", ...]
+  investments: [{ name: 'Sample Investment', currency: 'USD', values: {} }],
+  fx: {},                   // {"2025-01": {USD:1, EUR:1.1, RON:0.22}, ...}
+  income: {},               // {"2025-01": 0, ...}
+  totalInvestments: {},     // {"2025-01": 0, ...}
+  lastViewedMonth: null
+};
+
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+function load(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)); }catch{ return null; } }
+function fmtUSD(v){ if(!isFinite(v)) return '$0.00'; return v.toLocaleString(undefined,{style:'currency',currency:'USD',maximumFractionDigits:2}); }
+function fmtPct(x){ if(!isFinite(x)) return '0.00%'; return (x*100).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})+'%'; }
+function classForDelta(x){ return x>0 ? 'good' : (x<0 ? 'bad' : ''); }
+
+function yyyymm(d){ return d.toISOString().slice(0,7); }
+function prevMonthStr(m){ const [y,mo]=m.split('-').map(Number); const d=new Date(y, mo-2, 1); return d.toISOString().slice(0,7); }
+
+// Ensure a month exists with baseline FX = {USD:1}
+function ensureMonth(month){
+  if(!state.months.includes(month)){ state.months.push(month); state.months.sort(); }
+  state.fx[month] = Object.assign({USD:1}, state.fx[month]||{});
+  DEFAULT_CURRENCIES.forEach(c=>{ if(state.fx[month][c]==null){ state.fx[month][c] = (c==='USD'?1:0); }});
+  state.income[month] = state.income[month] ?? 0;
+  state.totalInvestments[month] = state.totalInvestments[month] ?? 0;
+}
+
+// Compute totals per month in USD
+function totalsUSD(){
+  const totals={};
+  for(const m of state.months){
+    let sum=0;
+    for(const inv of state.investments){
+      const v = Number(inv.values[m]||0);
+      const fx = Number((state.fx[m]||{})[inv.currency]||0);
+      sum += v * fx;
+    }
+    totals[m]=sum;
+  }
+  return totals;
+}
+
+function monthMoM(m, series){
+  const prev=series[prevMonthStr(m)], cur=series[m];
+  if(prev==null || prev===0) return 0;
+  return (cur/prev - 1);
+}
+function monthYTD(m, series){
+  const y=m.slice(0,4);
+  const baseMonth = (y-1) + '-12';
+  const baseVal = series[baseMonth];
+  const cur = series[m];
+  if(baseVal==null || baseVal===0) return 0;
+  return (cur/baseVal - 1);
+}
+
+function computeBestWorst(m){
+  const deltas=[];
+  for(const inv of state.investments){
+    const vCur = Number(inv.values[m]||0);
+    const vPrev = Number(inv.values[prevMonthStr(m)]||0);
+    const fxCur = Number((state.fx[m]||{})[inv.currency]||0);
+    const fxPrev = Number((state.fx[prevMonthStr(m)]||{})[inv.currency]||0);
+    const usdCur = vCur*fxCur, usdPrev=vPrev*fxPrev;
+    if(usdPrev>0){ deltas.push({name:inv.name, pct: (usdCur/usdPrev-1)}); }
+  }
+  deltas.sort((a,b)=>b.pct-a.pct);
+  if(!deltas.length) return '—';
+  const best=deltas[0], worst=deltas[deltas.length-1];
+  const bp=`<span class="${classForDelta(best.pct)}">${best.name}: ${fmtPct(best.pct)}</span>`;
+  const wp=`<span class="${classForDelta(worst.pct)}">${worst.name}: ${fmtPct(worst.pct)}</span>`;
+  return bp+"<br>"+wp;
+}
+
+// ====== UI Rendering ======
+const tbl = document.getElementById('dataTable');
+
+function renderTable(){
+  const months = [...state.months].sort();
+
+  let thead = `<thead><tr>`
+    + `<th>Investment</th><th>Currency</th>`
+    + months.map(m=>`<th>${m}</th>`).join('')
+    + `<th>MoM %</th><th>YTD %</th>`
+    + `</tr></thead>`;
+
+  let body = '<tbody>';
+  const totalsPerMonth = totalsUSD();
+
+  for(const inv of state.investments){
+    let row = `<tr>`;
+    row += `<td><input value="${inv.name}" data-field="name" data-id="${inv._id||assignId(inv)}"/></td>`;
+    row += `<td><select data-field="currency" data-id="${inv._id}">${DEFAULT_CURRENCIES.map(c=>`<option value="${c}" ${inv.currency===c?'selected':''}>${c}</option>`).join('')}</select></td>`;
+
+    for(const m of months){
+      const val = inv.values[m] ?? '';
+      row += `<td><input type="number" step="0.01" placeholder="0.00" value="${val}" data-field="cell" data-month="${m}" data-id="${inv._id}" class="mono"></td>`;
+    }
+
+    const m = months[months.length-1];
+    if(m){
+      const cur = Number(inv.values[m]||0) * Number(state.fx[m]?.[inv.currency]||0);
+      const pm = prevMonthStr(m);
+      const prev = Number(inv.values[pm]||0) * Number(state.fx[pm]?.[inv.currency]||0);
+      const ytdBaseM = (parseInt(m.slice(0,4))-1)+"-12";
+      const ytdBase = Number(inv.values[ytdBaseM]||0) * Number(state.fx[ytdBaseM]?.[inv.currency]||0);
+      const mom = (prev>0)? (cur/prev-1): 0;
+      const ytd = (ytdBase>0)? (cur/ytdBase-1): 0;
+      row += `<td class="mono ${classForDelta(mom)}">${mom>=0?fmtPct(mom):`(${fmtPct(-mom)})`}</td>`;
+      row += `<td class="mono ${classForDelta(ytd)}">${ytd>=0?fmtPct(ytd):`(${fmtPct(-ytd)})`}</td>`;
+    } else {
+      row += `<td class="mono">0.00%</td><td class="mono">0.00%</td>`;
+    }
+
+    row += `</tr>`;
+    body += row;
+  }
+
+  // Totals row (auto) in USD
+  let totalRow = `<tr>`
+    + `<td><span class="muted">Total (USD)</span></td>`
+    + `<td class="mono">USD</td>`
+    + months.map(m=>`<td class="mono">${fmtUSD(totalsPerMonth[m]||0)}</td>`).join('')
+    + (()=>{
+        const m = months[months.length-1];
+        if(!m) return `<td class="mono">0.00%</td><td class="mono">0.00%</td>`;
+        const mom = monthMoM(m, totalsPerMonth);
+        const ytd = monthYTD(m, totalsPerMonth);
+        const momHtml = mom>=0?fmtPct(mom):`(${fmtPct(-mom)})`;
+        const ytdHtml = ytd>=0?fmtPct(ytd):`(${fmtPct(-ytd)})`;
+        return `<td class="mono ${classForDelta(mom)}">${momHtml}</td><td class="mono ${classForDelta(ytd)}">${ytdHtml}</td>`;
+      })()
+    + `</tr>`;
+
+  body += totalRow + '</tbody>';
+
+  tbl.innerHTML = thead + body;
+  renderMonthFooter(months);
+}
+
+function renderMonthFooter(months){
+  const footerId = 'monthFooter';
+  let el = document.getElementById(footerId);
+  if(!el){ el = document.createElement('div'); el.id=footerId; el.className='card'; el.style.marginTop='10px'; document.getElementById('tableWrap').after(el); }
+  if(!months.length){ el.innerHTML = '<span class="muted">Add a month to start entering FX, Income and totals.</span>'; return; }
+  const last = months[months.length-1];
+  const fx = state.fx[last]||{USD:1,EUR:0,RON:0};
+  const inc = state.income[last]||0;
+  const totInv = state.totalInvestments[last]||0;
+  el.innerHTML = `
+    <div class="row" style="align-items:flex-end">
+      <div class="card" style="flex:1 1 260px">
+        <h3 class="sub">Edit Month</h3>
+        <div class="toolbar">
+          <label>Selected: <b>${last}</b></label>
+          <button id="btnPickMonth">Change…</button>
+          <button id="btnRemoveMonth" class="right">Remove Month</button>
+        </div>
+      </div>
+      <div class="card" style="flex:2 1 360px">
+        <h3 class="sub">FX (USD base) for ${last}</h3>
+        <div class="toolbar">
+          <label>USD</label><input type="number" step="0.0001" id="fxUSD" value="${fx.USD??1}">
+          <label>EUR</label><input type="number" step="0.0001" id="fxEUR" value="${fx.EUR??0}">
+          <label>RON</label><input type="number" step="0.0001" id="fxRON" value="${fx.RON??0}">
+          <button id="btnSaveFX">Save FX</button>
+        </div>
+      </div>
+      <div class="card" style="flex:2 1 360px">
+        <h3 class="sub">Savings Inputs for ${last}</h3>
+        <div class="toolbar">
+          <label>Income</label><input type="number" step="0.01" id="incVal" value="${inc}">
+          <label>Total Investments</label><input type="number" step="0.01" id="totInvVal" value="${totInv}">
+          <button id="btnSaveIncome">Save</button>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('btnPickMonth').onclick = ()=>{
+    const m = prompt('Enter month as YYYY-MM'); if(!m) return; if(!/^\d{4}-\d{2}$/.test(m)) return alert('Format must be YYYY-MM'); ensureMonth(m); state.lastViewedMonth=m; save(); renderAll();
+  };
+  document.getElementById('btnRemoveMonth').onclick = ()=>{
+    if(!confirm('Remove last month '+last+'? This deletes values & FX for this month.')) return;
+    state.months = state.months.filter(x=>x!==last);
+    delete state.fx[last]; delete state.income[last]; delete state.totalInvestments[last];
+    for(const inv of state.investments){ delete inv.values[last]; }
+    save(); renderAll();
+  };
+  document.getElementById('btnSaveFX').onclick = ()=>{
+    const m=last; ensureMonth(m);
+    state.fx[m]={USD:Number(document.getElementById('fxUSD').value||1), EUR:Number(document.getElementById('fxEUR').value||0), RON:Number(document.getElementById('fxRON').value||0)};
+    save(); renderAll();
+  };
+  document.getElementById('btnSaveIncome').onclick = ()=>{
+    const m=last; ensureMonth(m);
+    state.income[m]=Number(document.getElementById('incVal').value||0);
+    state.totalInvestments[m]=Number(document.getElementById('totInvVal').value||0);
+    save(); renderAll();
+  };
+}
+
+function assignId(inv){ inv._id = inv._id || Math.random().toString(36).slice(2,9); return inv._id; }
+
+// Handle inputs inside table
+tbl.addEventListener('change', (e)=>{
+  const t=e.target; const id=t.getAttribute('data-id'); const field=t.getAttribute('data-field');
+  const inv = state.investments.find(x=>x._id===id);
+  if(!inv) return;
+  if(field==='name'){ inv.name=t.value; }
+  if(field==='currency'){ inv.currency=t.value; }
+  if(field==='cell'){
+    const m=t.getAttribute('data-month'); ensureMonth(m);
+    inv.values[m]= Number(t.value||0);
+  }
+  save(); renderAll();
+});
+
+// Add Month / Investment
+document.getElementById('btnAddMonth').onclick = ()=>{
+  let m = prompt('Add month (YYYY-MM)');
+  if(!m) return; if(!/^\d{4}-\d{2}$/.test(m)) return alert('Format must be YYYY-MM');
+  ensureMonth(m); state.lastViewedMonth=m; save(); renderAll();
+};
+document.getElementById('btnAddInvestment').onclick = ()=>{
+  const name = prompt('Investment name'); if(!name) return;
+  const currency = prompt('Currency (USD/EUR/RON)', 'USD')||'USD';
+  state.investments.push({name, currency: (['USD','EUR','RON'].includes(currency.toUpperCase())?currency.toUpperCase():'USD'), values:{}});
+  save(); renderAll();
+};
+
+// Export / Import JSON
+document.getElementById('btnExport').onclick = ()=>{
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='portfolio.json'; a.click(); URL.revokeObjectURL(a.href);
+};
+document.getElementById('fileImport').addEventListener('change', (e)=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{ state=JSON.parse(r.result); save(); renderAll(); }catch(err){ alert('Invalid JSON'); } };
+  r.readAsText(f);
+});
+document.getElementById('btnClear').onclick=()=>{ if(confirm('Clear all local data?')){ localStorage.removeItem(LS_KEY); location.reload(); } };
+
+// ---- Excel/CSV Import (SheetJS) ----
+const btnImportX = document.getElementById('btnImportX');
+const fileX = document.getElementById('fileXLSX');
+if(btnImportX && fileX){
+  btnImportX.onclick = ()=> fileX.click();
+  fileX.addEventListener('change', async (e)=>{
+    const f=e.target.files[0]; if(!f) return;
+    const data = await f.arrayBuffer();
+    let wb; try{ wb = XLSX.read(data, {type:'array'}); }catch(err){ alert('Failed to read file'); return; }
+    const wsname = wb.SheetNames[0];
+    const ws = wb.Sheets[wsname];
+    const arr = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:''});
+    try{ importFrom2D(arr); alert('Import complete! Review FX and savings inputs per month.'); }catch(err){ console.error(err); alert('Import error: '+err.message); }
+    save(); renderAll();
+  });
+}
+function importFrom2D(rows){
+  const MONTH_NAMES = ['january','february','march','april','may','june','july','august','september','october','november','december','jan','feb','mar','apr','may','jun','jul','aug','sep','sept','oct','nov','dec'];
+  const isMonthWord = (s)=> MONTH_NAMES.includes(String(s).trim().toLowerCase());
+  const isYear = (s)=>/^\d{4}$/.test(String(s).trim());
+  let headerRowIdx = -1;
+  for(let r=0;r<Math.min(rows.length,30);r++){
+    const count = rows[r].filter(c=> isMonthWord(c) || /^\d{4}-\d{2}$/.test(String(c).trim()) ).length;
+    if(count>=3){ headerRowIdx=r; break; }
+  }
+  if(headerRowIdx<0) throw new Error('Could not find header row with months.');
+  const headerRow = rows[headerRowIdx];
+
+  let months=[]; let curYear=null; let lastMonthNum=null;
+  for(let c=1;c<headerRow.length;c++){ // assume col0 is investment name
+    const cell = String(headerRow[c]||'').trim();
+    if(!cell) continue;
+    if(isYear(cell)){ curYear = Number(cell); continue; }
+    let yymm = null;
+    if(/^\d{4}-\d{2}$/.test(cell)){
+      yymm = cell; curYear = Number(cell.slice(0,4)); lastMonthNum = Number(cell.slice(5,7));
+    } else if(isMonthWord(cell)){
+      if(curYear==null){ curYear = Number(prompt('Enter starting year for month header "'+cell+'" (e.g., 2023):', new Date().getFullYear())); }
+      const idx = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(cell.slice(0,3).toLowerCase());
+      let mnum = idx+1; if(lastMonthNum!=null && mnum<lastMonthNum){ curYear++; } lastMonthNum = mnum;
+      yymm = curYear + '-' + String(mnum).padStart(2,'0');
+    }
+    if(yymm) months.push({col:c, key:yymm});
+  }
+  if(!months.length) throw new Error('No month columns detected.');
+
+  const investments=[];
+  for(let r=headerRowIdx+1; r<rows.length; r++){
+    const name = String(rows[r][0]||'').trim();
+    if(!name) continue;
+    if(/^total/i.test(name) || /^ytd/i.test(name)) break;
+    const inv={ name, currency: guessCurrency(rows[r], months), values:{} };
+    months.forEach(({col,key})=>{
+      const raw = String(rows[r][col]||'').trim();
+      const num = parseMoney(raw);
+      if(num!=null) inv.values[key]=num;
+    });
+    investments.push(inv);
+  }
+
+  state.investments = investments.map(x=>({ ...x, _id: Math.random().toString(36).slice(2,9) }));
+  state.months = months.map(m=>m.key).sort();
+  state.fx = {}; state.income={}; state.totalInvestments={};
+  state.months.forEach(m=>{ state.fx[m] = {USD:1, EUR:0, RON:0}; state.income[m]=0; state.totalInvestments[m]=0; });
+}
+function parseMoney(s){
+  if(s===undefined || s===null) return null;
+  s = String(s).replace(/RON|EUR|USD|lei|\$/gi,'').replace(/\u20ac/g,'').replace(/[,\s]/g,'');
+  if(s==='') return null; const v = Number(s); return isFinite(v)?v:null;
+}
+function guessCurrency(row, months){
+  for(const {col} of months){
+    const raw = String(row[col]||'');
+    if(!raw) continue;
+    if(/[€]/.test(raw) || /EUR/i.test(raw)) return 'EUR';
+    if(/RON|lei/i.test(raw)) return 'RON';
+    if(/\$|USD/i.test(raw)) return 'USD';
+  }
+  return 'USD';
+}
+
+// ====== Charts & KPIs ======
+let totalChart, pnlChart;
+function renderKPIs(){
+  const months=[...state.months].sort(); const totals=totalsUSD();
+  const last=months[months.length-1]; const prev=prevMonthStr(last);
+  const totalCur = totals[last]||0; const totalPrev = totals[prev]||0;
+  document.getElementById('kpiTotal').textContent = fmtUSD(totalCur);
+  document.getElementById('kpiAsOf').textContent = last?('as of '+last):'';
+
+  const mom = (totalPrev>0)? (totalCur/totalPrev-1) : 0;
+  const momAbs = totalCur-totalPrev;
+  const kpiMoM=document.getElementById('kpiMoM'); kpiMoM.textContent = mom>=0?fmtPct(mom):`(${fmtPct(-mom)})`; kpiMoM.className = 'val mono '+classForDelta(mom);
+  const kpiMoMAbs=document.getElementById('kpiMoMAbs'); kpiMoMAbs.textContent = `${momAbs>=0?'+':''}${fmtUSD(momAbs)}`; kpiMoMAbs.className='delta '+classForDelta(mom);
+
+  const ytd = monthYTD(last||'', totals);
+  const ytdAbs = last? ( (totals[last]||0) - (totals[(parseInt(last.slice(0,4))-1)+"-12"]||0) ):0;
+  const kpiYTD=document.getElementById('kpiYTD'); kpiYTD.textContent = ytd>=0?fmtPct(ytd):`(${fmtPct(-ytd)})`; kpiYTD.className='val mono '+classForDelta(ytd);
+  const kpiYTDAbs=document.getElementById('kpiYTDAbs'); kpiYTDAbs.textContent = `${ytdAbs>=0?'+':''}${fmtUSD(ytdAbs)}`; kpiYTDAbs.className='delta '+classForDelta(ytd);
+
+  const inc = state.income[last]||0; const tinv = state.totalInvestments[last]||0; const rate = (inc>0)? (tinv/inc):0;
+  const kpiSR=document.getElementById('kpiSaveRate'); kpiSR.textContent = fmtPct(rate);
+  document.getElementById('kpiIncomeInfo').textContent = `${last?last:''}  Income: ${fmtUSD(inc)}  •  Investments: ${fmtUSD(tinv)}`;
+
+  document.getElementById('kpiBestWorst').innerHTML = last? computeBestWorst(last) : '—';
+}
+function renderCharts(){
+  const months=[...state.months].sort(); const totals=totalsUSD();
+  const labels=months; const values=months.map(m=>totals[m]||0);
+  const pnl = months.map((m,i)=> i===0? 0 : ( (totals[m]||0) - (totals[months[i-1]]||0) ));
+  const totalCtx=document.getElementById('totalChart');
+  const pnlCtx=document.getElementById('pnlChart');
+  if(totalChart) totalChart.destroy();
+  if(pnlChart) pnlChart.destroy();
+  totalChart = new Chart(totalCtx,{ type:'line', data:{ labels, datasets:[{ label:'Total USD', data:values, tension:.2, fill:false }] }, options:{ plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#9fb0c3'}}, y:{ticks:{color:'#9fb0c3'}}} });
+  pnlChart = new Chart(pnlCtx,{ type:'bar', data:{ labels, datasets:[{ label:'Monthly P&L (USD)', data:pnl }] }, options:{ plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#9fb0c3'}}, y:{ticks:{color:'#9fb0c3'}}} });
+}
+function renderAll(){ renderTable(); renderKPIs(); renderCharts(); }
+
+// Init
+if(!state.months.length){ const m = yyyymm(new Date()); ensureMonth(m); state.lastViewedMonth=m; save(); }
+state.investments.forEach(assignId);
+renderAll();
+</script>
+</body>
+</html>
